@@ -1,12 +1,10 @@
 import torch
 import torch.nn as nn
-from torchvision import models
 import torch.optim as optim
 from pytorch_lightning import LightningModule
 import torchmetrics
 from typing import Tuple
 import timm  # 导入 timm 库
-import torch.nn.functional as F
 
 
 class CatFaceModule(LightningModule):
@@ -15,22 +13,21 @@ class CatFaceModule(LightningModule):
 
         self.save_hyperparameters()
 
-        # 使用 ConvNeXt-Tiny 作为 backbone
+        # 使用 ConvNeXt-Tiny 作为 backbone, pretrained=False
         self.net = timm.create_model('convnext_tiny', pretrained=False, num_classes=0,
-                                      global_pool='avg')  # 取消默认分类头，使用自定义分类头
+                                      global_pool='')  # 取消默认分类头和global pool
 
-        # 自动推断输入维度 (改进版本)
-        if hasattr(self.net, 'classifier') and hasattr(self.net.classifier, 'in_features'):
-            in_features = self.net.classifier.in_features # For models with a classifier attribute
-        elif hasattr(self.net, 'head') and hasattr(self.net.head, 'fc'):
-            in_features = self.net.head.fc.in_features # ConvNeXt style
-        elif hasattr(self.net, 'fc') and hasattr(self.net, 'global_pool'):
-            # Adaptive pooling but no head, need to determine the number of features manually
-            sample_tensor = torch.randn(1, 3, 224, 224)
-            features = self.net(sample_tensor).shape[1]  # Extract number of features from the tensor.
-            in_features = features
-        else:
-             in_features = 768  # Provide a default to avoid crash
+        # 自动推断输入维度 (最终版本，更通用)
+        sample_tensor = torch.randn(1, 3, 224, 224)  # 创建一个示例张量
+        with torch.no_grad():
+            features = self.net(sample_tensor)  # 通过网络传递示例张量
+
+            # 如果有global pool，手动flatten
+            if len(features.shape) > 2:  # 例如 [1, 768, 7, 7]
+                features = torch.flatten(features, start_dim=1)  # 展平为 [1, 768*7*7]
+
+        in_features = features.shape[1]  # 获取特征向量的长度
+
 
         # 自定义分类头
         self.classifier = nn.Sequential(
@@ -43,6 +40,9 @@ class CatFaceModule(LightningModule):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         features = self.net(x)
+        #print("shape of features after net",features.shape)
+        if len(features.shape) > 2:  # 如果有global pool，手动flatten
+            features = torch.flatten(features, start_dim=1)  # 展平为 [B, 768*7*7]
         return self.classifier(features)
 
     def training_step(self, batch: Tuple[torch.Tensor, torch.LongTensor], batch_idx: int) -> torch.Tensor:
