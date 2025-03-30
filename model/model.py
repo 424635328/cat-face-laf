@@ -15,7 +15,7 @@ class CatFaceModule(LightningModule):
         self.save_hyperparameters()
 
         # 使用 ConvNeXt-Tiny 作为 backbone
-        self.net = timm.create_model('convnext_tiny', pretrained=True, num_classes=0,
+        self.net = timm.create_model('convnext_tiny', pretrained=False, num_classes=0,
                                       global_pool='avg')  # 取消默认分类头，使用自定义分类头
         in_features = self.net.head.fc.in_features if hasattr(self.net, 'head') and hasattr(self.net.head, 'fc') else self.net.fc.in_features if hasattr(self.net, 'fc') else 768 # Auto infer input dimension, based on possible attr name head.fc.in_features or fc.in_features
         # 自定义分类头
