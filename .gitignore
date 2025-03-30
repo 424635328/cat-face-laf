@@ -2,7 +2,7 @@
 node_modules/
 # 拉取的图片
 photos/
-crop_photos/
+# crop_photos/
 # 训练数据和模型文件
 lightning_logs/
 checkpoints/
