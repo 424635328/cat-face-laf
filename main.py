@@ -8,6 +8,8 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 import os
 import json
 import time
+import requests
+from huggingface_hub.utils import HfHubHTTPError
 
 def main():
     # 解析命令行参数
@@ -26,7 +28,17 @@ def main():
     data_module = CatPhotoDataModule(args.data, args.size, args.filter, args.balance, args.batch)
 
     # 创建模型
-    model = CatFaceModule(len(data_module.cat_ids), args.lr, dropout_rate=0.2) # dropout_rate 0.2
+    try:
+        model = CatFaceModule(len(data_module.cat_ids), args.lr, dropout_rate=0.2) # dropout_rate 0.2
+    except (requests.exceptions.RequestException, HfHubHTTPError) as e:
+        print(f"模型加载失败：{e}")
+        print("请检查你的网络连接和 Hugging Face Hub 的状态。")
+        print("你可以尝试以下方法：")
+        print("1. 检查网络是否稳定，尝试 ping huggingface.co")
+        print("2. 检查防火墙是否阻止了对 huggingface.co 的访问")
+        print("3. 增加超时时间，例如设置环境变量 REQUESTS_TIMEOUT=30")
+        print("4. 如果可以，尝试手动下载模型并放置到本地缓存目录中")
+        raise  # 重新抛出异常，停止程序
 
     # 判断 GPU 是否可用
     device = 'gpu' if torch.cuda.is_available() else 'cpu'
