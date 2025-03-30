@@ -6,6 +6,7 @@ from pytorch_lightning import LightningModule
 import torchmetrics
 from typing import Tuple
 import timm  # 导入 timm 库
+import torch.nn.functional as F
 
 
 class CatFaceModule(LightningModule):
@@ -17,7 +18,20 @@ class CatFaceModule(LightningModule):
         # 使用 ConvNeXt-Tiny 作为 backbone
         self.net = timm.create_model('convnext_tiny', pretrained=False, num_classes=0,
                                       global_pool='avg')  # 取消默认分类头，使用自定义分类头
-        in_features = self.net.head.fc.in_features if hasattr(self.net, 'head') and hasattr(self.net.head, 'fc') else self.net.fc.in_features if hasattr(self.net, 'fc') else 768 # Auto infer input dimension, based on possible attr name head.fc.in_features or fc.in_features
+
+        # 自动推断输入维度 (改进版本)
+        if hasattr(self.net, 'classifier') and hasattr(self.net.classifier, 'in_features'):
+            in_features = self.net.classifier.in_features # For models with a classifier attribute
+        elif hasattr(self.net, 'head') and hasattr(self.net.head, 'fc'):
+            in_features = self.net.head.fc.in_features # ConvNeXt style
+        elif hasattr(self.net, 'fc') and hasattr(self.net, 'global_pool'):
+            # Adaptive pooling but no head, need to determine the number of features manually
+            sample_tensor = torch.randn(1, 3, 224, 224)
+            features = self.net(sample_tensor).shape[1]  # Extract number of features from the tensor.
+            in_features = features
+        else:
+             in_features = 768  # Provide a default to avoid crash
+
         # 自定义分类头
         self.classifier = nn.Sequential(
             nn.BatchNorm1d(in_features),  # 添加 BatchNorm
