@@ -15,38 +15,28 @@ class CatFaceModule(LightningModule):
         self.save_hyperparameters()
 
         # 使用 ConvNeXt-Tiny 作为 backbone, pretrained=False
-        self.net = timm.create_model('convnext_tiny', pretrained=False, num_classes=0,
-                                      global_pool='')  # 取消默认分类头和global pool
+        self.net = timm.create_model('convnext_tiny', pretrained=False, num_classes=0)  # 使用默认的global pool
 
-        # 自动推断输入维度 (最终版本，更通用)
+        # 自动推断输入维度
         sample_tensor = torch.randn(1, 3, 224, 224)  # 创建一个示例张量
         with torch.no_grad():
             features = self.net(sample_tensor)  # 通过网络传递示例张量
 
-            # 如果有global pool，手动flatten
-            if len(features.shape) > 2:  # 例如 [1, 768, 7, 7]
-                features = torch.flatten(features, start_dim=1)  # 展平为 [1, 768*7*7]
-
         in_features = features.shape[1]  # 获取特征向量的长度
-        print(f"Detected in_features: {in_features}") # 调试信息
-        
-        # 直接使用计算出的 in_features 值
-        bn_size = in_features
+        print(f"Detected in_features: {in_features}")  # 调试信息
 
         # 自定义分类头
         self.classifier = nn.Sequential(
-            nn.BatchNorm1d(bn_size),  # 添加 BatchNorm, 使用计算出的 in_features
+            nn.BatchNorm1d(in_features),  # 添加 BatchNorm
             nn.Dropout(dropout_rate),  # 添加 Dropout
-            nn.Linear(bn_size, num_classes)
+            nn.Linear(in_features, num_classes)
         )
 
         self.loss_func = nn.CrossEntropyLoss()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         features = self.net(x)
-        #print("shape of features after net",features.shape)
-        if len(features.shape) > 2:  # 如果有global pool，手动flatten
-            features = torch.flatten(features, start_dim=1)  # 展平为 [B, 768*7*7]
+
         return self.classifier(features)
 
     def training_step(self, batch: Tuple[torch.Tensor, torch.LongTensor], batch_idx: int) -> torch.Tensor:
@@ -75,7 +65,8 @@ class CatFaceModule(LightningModule):
         with torch.no_grad():
             # 每个类别分别计算准确率，以平衡地综合考虑每只猫的准确率
             accuracy_per_class = torchmetrics.functional.accuracy(out, y, task="multiclass",
-                                                                   num_classes=self.hparams['num_classes'], average=None)
+                                                                   num_classes=self.hparams['num_classes'],
+                                                                   average=None)
             # 去掉batch中没有出现的类别，这些位置为nan
             nan_mask = accuracy_per_class.isnan()
             accuracy_per_class = accuracy_per_class.masked_fill(nan_mask, 0)
