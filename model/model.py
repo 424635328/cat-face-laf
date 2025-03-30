@@ -29,12 +29,15 @@ class CatFaceModule(LightningModule):
 
         in_features = features.shape[1]  # 获取特征向量的长度
         print(f"Detected in_features: {in_features}") # 调试信息
+        
+        # 直接使用计算出的 in_features 值
+        bn_size = in_features
 
         # 自定义分类头
         self.classifier = nn.Sequential(
-            nn.BatchNorm1d(in_features),  # 添加 BatchNorm
+            nn.BatchNorm1d(bn_size),  # 添加 BatchNorm, 使用计算出的 in_features
             nn.Dropout(dropout_rate),  # 添加 Dropout
-            nn.Linear(in_features, num_classes)
+            nn.Linear(bn_size, num_classes)
         )
 
         self.loss_func = nn.CrossEntropyLoss()
@@ -54,7 +57,7 @@ class CatFaceModule(LightningModule):
 
         return loss
 
-    def validation_step(self, batch, batch_idx: int):
+    def validation_step(self, batch, batch_idx):
         loss, acc = self.do_step(batch)
 
         self.log('val/loss', loss, on_step=False, on_epoch=True)
