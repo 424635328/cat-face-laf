@@ -5,6 +5,7 @@ from pytorch_lightning import LightningModule
 import torchmetrics
 from typing import Tuple
 import timm  # 导入 timm 库
+import torch.nn.functional as F
 
 
 class CatFaceModule(LightningModule):
@@ -27,7 +28,7 @@ class CatFaceModule(LightningModule):
                 features = torch.flatten(features, start_dim=1)  # 展平为 [1, 768*7*7]
 
         in_features = features.shape[1]  # 获取特征向量的长度
-
+        print(f"Detected in_features: {in_features}") # 调试信息
 
         # 自定义分类头
         self.classifier = nn.Sequential(
