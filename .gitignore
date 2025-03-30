@@ -1,0 +1,23 @@
+# npm包
+node_modules/
+# 拉取的图片
+photos/
+crop_photos/
+# 训练数据和模型文件
+lightning_logs/
+checkpoints/
+# 模型导出文件
+export/
+# Python 垃圾
+__pycache__/
+# MacOS的垃圾
+.DS_Store
+# 日志文件
+*.log
+*log*.txt
+# 环境配置
+.env
+config.ts
+.ipynb_checkpoints/
+env
+.vscode
